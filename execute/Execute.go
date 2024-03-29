@@ -33,21 +33,20 @@ func forwardRead(pipe io.ReadCloser, ch chan<- []byte) {
 			break
 		}
 	}
-
 }
 
 func forwardWrite(ch <-chan []byte, in io.WriteCloser) {
 	for {
 		input, ok := <-ch
-		to_write := len(input)
+		toWrite := len(input)
 
 		if input != nil {
-			for to_write > 0 {
-				wrote, err := in.Write(input[len(input)-to_write:])
+			for toWrite > 0 {
+				wrote, err := in.Write(input[len(input)-toWrite:])
 				if err != nil {
 					break
 				}
-				to_write -= wrote
+				toWrite -= wrote
 			}
 		}
 
@@ -85,16 +84,16 @@ func Execute(command Command, setup ...func(e *exec.Cmd)) (Execution, error) {
 		return Execution{}, err
 	}
 
-	ch_stdin := make(chan []byte)
-	ch_stdout := make(chan []byte)
-	ch_stderr := make(chan []byte)
-	ch_exit := make(chan error)
+	chStdin := make(chan []byte)
+	chStdout := make(chan []byte)
+	chStderr := make(chan []byte)
+	chExit := make(chan error)
 
 	execution := Execution{
-		Stderr: ch_stderr,
-		Stdout: ch_stdout,
-		Stdin:  ch_stdin,
-		Exit:   ch_exit,
+		Stderr: chStderr,
+		Stdout: chStdout,
+		Stdin:  chStdin,
+		Exit:   chExit,
 		Kill: func() error {
 			if cmd.Process == nil {
 				return MakeError("process is nil")
@@ -103,13 +102,13 @@ func Execute(command Command, setup ...func(e *exec.Cmd)) (Execution, error) {
 			return cmd.Process.Kill()
 		}}
 
-	go forwardRead(stdout, ch_stdout)
-	go forwardRead(stderr, ch_stderr)
-	go forwardWrite(ch_stdin, stdin)
+	go forwardRead(stdout, chStdout)
+	go forwardRead(stderr, chStderr)
+	go forwardWrite(chStdin, stdin)
 
 	go func() {
 		err = cmd.Wait()
-		ch_exit <- err
+		chExit <- err
 	}()
 
 	return execution, nil
