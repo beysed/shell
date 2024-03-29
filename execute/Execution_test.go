@@ -2,12 +2,36 @@ package execute
 
 import (
 	"fmt"
+	"os/exec"
 	"runtime"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestEnvironment(t *testing.T) {
+	exe, _ := Execute(
+		MakeCommand("bash", "-c", "echo $MY"),
+		func(c *exec.Cmd) {
+			c.Env = append(c.Env, "MY=MY")
+		})
+
+	for run := true; run; {
+		select {
+		case o := <-exe.Stdout:
+			assert.Equal(t, "MY", o)
+		case o := <-exe.Stderr:
+			fmt.Println(string(o))
+		case <-exe.Exit:
+			run = false
+
+		case <-time.After(time.Second * 3):
+			t.Error("exit not fired, process hags, timeout")
+			run = false
+		}
+	}
+}
 
 func TestConversationSed(t *testing.T) {
 	exe, _ := Execute(MakeCommand("sed", "-e", "s/s/S/"))
