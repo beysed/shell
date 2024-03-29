@@ -72,7 +72,7 @@ func Execute(file string, args ...string) (Execution, error) {
 			input, ok := <-ch_stdin
 			to_write := len(input)
 
-			if input != nil && to_write > 0 {
+			if input != nil {
 				for to_write > 0 {
 					wrote, err := stdin.Write(input[len(input)-to_write:])
 					if err != nil {
@@ -83,6 +83,7 @@ func Execute(file string, args ...string) (Execution, error) {
 			}
 
 			if !ok {
+				stdin.Close()
 				break
 			}
 		}

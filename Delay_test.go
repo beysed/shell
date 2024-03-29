@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func Test_Delay(t *testing.T) {
+func TestDelay(t *testing.T) {
 	context, _ := context.WithCancel(context.Background())
 
 	select {
@@ -16,7 +16,7 @@ func Test_Delay(t *testing.T) {
 	}
 }
 
-func Test_Delay_Cancel(t *testing.T) {
+func TestDelayCancel(t *testing.T) {
 	context, cancel := context.WithCancel(context.Background())
 
 	ch := Delay(time.Second*3, context)
