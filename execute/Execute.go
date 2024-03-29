@@ -9,8 +9,61 @@ import (
 // ^D 0x04
 // ^Z 0x1a
 
-func Execute(file string, args ...string) (Execution, error) {
-	cmd := exec.Command(file, args...)
+type Command struct {
+	File string
+	Args []string
+}
+
+func MakeCommand(file string, args ...string) Command {
+	return Command{File: file, Args: args}
+}
+
+// func MakeExecution(cmd exec.Cmd) Execution {
+// }
+
+func forwardRead(pipe io.ReadCloser, ch chan<- []byte) {
+	buf := make([]byte, 64)
+	for {
+		l, err := pipe.Read(buf)
+		if l != 0 {
+			ch <- buf[:l]
+		}
+
+		if err != nil {
+			break
+		}
+	}
+
+}
+
+func forwardWrite(ch <-chan []byte, in io.WriteCloser) {
+	for {
+		input, ok := <-ch
+		to_write := len(input)
+
+		if input != nil {
+			for to_write > 0 {
+				wrote, err := in.Write(input[len(input)-to_write:])
+				if err != nil {
+					break
+				}
+				to_write -= wrote
+			}
+		}
+
+		if !ok {
+			in.Close()
+			break
+		}
+	}
+}
+
+func Execute(command Command, setup ...func(e *exec.Cmd)) (Execution, error) {
+	cmd := exec.Command(command.File, command.Args...)
+
+	for _, v := range setup {
+		v(cmd)
+	}
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -50,44 +103,9 @@ func Execute(file string, args ...string) (Execution, error) {
 			return cmd.Process.Kill()
 		}}
 
-	forward := func(pipe io.ReadCloser, ch chan<- []byte) {
-		buf := make([]byte, 64)
-		for {
-			l, err := pipe.Read(buf)
-			if l != 0 {
-				ch <- buf[:l]
-			}
-
-			if err != nil {
-				break
-			}
-		}
-
-	}
-	go forward(stdout, ch_stdout)
-	go forward(stderr, ch_stderr)
-
-	go func() {
-		for {
-			input, ok := <-ch_stdin
-			to_write := len(input)
-
-			if input != nil {
-				for to_write > 0 {
-					wrote, err := stdin.Write(input[len(input)-to_write:])
-					if err != nil {
-						break
-					}
-					to_write -= wrote
-				}
-			}
-
-			if !ok {
-				stdin.Close()
-				break
-			}
-		}
-	}()
+	go forwardRead(stdout, ch_stdout)
+	go forwardRead(stderr, ch_stderr)
+	go forwardWrite(ch_stdin, stdin)
 
 	go func() {
 		err = cmd.Wait()

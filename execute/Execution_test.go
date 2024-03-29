@@ -10,7 +10,7 @@ import (
 )
 
 func TestConversationSed(t *testing.T) {
-	exe, _ := Execute("sed", "-e", "s/s/S/")
+	exe, _ := Execute(MakeCommand("sed", "-e", "s/s/S/"))
 
 	exe.Stdin <- []byte("sss")
 	close(exe.Stdin)
@@ -35,7 +35,7 @@ func TestConversationSed(t *testing.T) {
 }
 
 func TestConversationCat(t *testing.T) {
-	exe, _ := Execute("cat")
+	exe, _ := Execute(MakeCommand("cat"))
 
 	exe.Stdin <- []byte{97, 97, 97}
 	close(exe.Stdin)
@@ -71,7 +71,7 @@ func TestOutput(t *testing.T) {
 		args = []string{"-c", "ls -la"}
 	}
 
-	exe, _ := Execute(command, args...)
+	exe, _ := Execute(MakeCommand(command, args...))
 
 	for run := true; run; {
 		select {
