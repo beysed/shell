@@ -9,7 +9,32 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestConversation(t *testing.T) {
+func TestConversationSed(t *testing.T) {
+	exe, _ := Execute("sed", "-e", "s/s/S/")
+
+	exe.Stdin <- []byte("sss")
+	close(exe.Stdin)
+
+	var output string
+	for run := true; run; {
+		select {
+		case o := <-exe.Stdout:
+			output += string(o)
+		case o := <-exe.Stderr:
+			fmt.Println(string(o))
+		case <-exe.Exit:
+			run = false
+
+		case <-time.After(time.Second * 3):
+			t.Error("exit not fired, process hags, timeout")
+			run = false
+		}
+	}
+
+	assert.Equal(t, "Sss", string(output))
+}
+
+func TestConversationCat(t *testing.T) {
 	exe, _ := Execute("cat")
 
 	exe.Stdin <- []byte{97, 97, 97}
