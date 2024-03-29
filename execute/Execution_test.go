@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os/exec"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,26 +12,36 @@ import (
 )
 
 func TestEnvironment(t *testing.T) {
-	exe, _ := Execute(
-		MakeCommand("bash", "-c", "echo $MY"),
-		func(c *exec.Cmd) {
-			c.Env = append(c.Env, "MY=MY")
-		})
+	var command Command
 
+	setup := func(c *exec.Cmd) {
+		c.Env = []string{"MY=MY"}
+	}
+
+	if runtime.GOOS == "windows" {
+		command = MakeCommand("cmd.exe", "/c", "echo %MY%")
+	} else {
+		command = MakeCommand("bash", "-c", "printenv MY")
+	}
+
+	exe, _ := Execute(command, setup)
+
+	hasOutput := false
 	for run := true; run; {
 		select {
 		case o := <-exe.Stdout:
-			assert.Equal(t, "MY", o)
+			assert.True(t, strings.HasPrefix(string(o), "MY"))
+			hasOutput = true
 		case o := <-exe.Stderr:
 			fmt.Println(string(o))
 		case <-exe.Exit:
 			run = false
-
 		case <-time.After(time.Second * 3):
 			t.Error("exit not fired, process hags, timeout")
 			run = false
 		}
 	}
+	assert.True(t, hasOutput)
 }
 
 func TestConversationSed(t *testing.T) {
