@@ -11,7 +11,7 @@ Shell related functions and stuff
 
 ## Execute
 
-The module provides convenient way to execute external commands and deal with its `stdout`/`stderr` as well as with `stdin` (see unit tests for exampples)
+The module provides convenient way to execute external commands and deal with its `stdout`/`stderr` as well as with `stdin` (see unit tests for examples)
 
 ```
 command := MakeCommand("sed", "-e", "s/a/A/g")
