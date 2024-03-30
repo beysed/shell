@@ -26,6 +26,8 @@ func execute(t *testing.T, exe Execution) (bool, string) {
 			run = false
 		case <-time.After(time.Second * 3):
 			t.Error("exit not fired, process hags, timeout")
+			exe.Kill()
+
 			run = false
 		}
 	}
@@ -91,4 +93,27 @@ func TestOutput(t *testing.T) {
 	exe, _ := Execute(MakeCommand(command, args...))
 	hasOutput, _ := execute(t, exe)
 	assert.True(t, hasOutput)
+}
+
+func TestExample(t *testing.T) {
+	command := MakeCommand("sed", "-e", "s/a/A/g")
+	execution, _ := Execute(command)
+
+	execution.Stdin <- []byte("aaa")
+	close(execution.Stdin)
+
+	for run := true; run; {
+		select {
+		case out := <-execution.Stdout:
+			fmt.Print(string(out))
+		case err := <-execution.Stderr:
+			fmt.Println(string(err))
+		case <-execution.Exit:
+			run = false
+		case <-time.After(time.Second * 3):
+			t.Error("process killed by timeout")
+			execution.Kill()
+			run = false
+		}
+	}
 }
