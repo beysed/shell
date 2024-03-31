@@ -8,6 +8,7 @@ import (
 // ^C 0x03
 // ^D 0x04
 // ^Z 0x1a
+//
 
 type Command struct {
 	File string
