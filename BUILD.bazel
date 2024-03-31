@@ -1,0 +1,39 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test", "nogo")
+load("@bazel_gazelle//:def.bzl", "gazelle")
+
+# bazel test //... --test_output=all --test_arg=--ginkgo.focus --test_arg='Sample T' --test_arg=--ginkgo.v
+
+nogo(
+    name = "lint",
+    vet = True,
+    visibility = ["//visibility:public"],
+)
+
+# gazelle:prefix github.com/beysed/shell
+gazelle(name = "gazelle")
+
+gazelle(
+    name = "gazelle-update-repos",
+    args = [
+        "-from_file=go.mod",
+        "-to_macro=deps.bzl%go_dependencies",
+        "-prune",
+    ],
+    command = "update-repos",
+)
+
+go_library(
+    name = "shell",
+    srcs = [
+        "Delay.go",
+        "SigTerm.go",
+    ],
+    importpath = "github.com/beysed/shell",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "shell_test",
+    srcs = ["Delay_test.go"],
+    embed = [":shell"],
+)
