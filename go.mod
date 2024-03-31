@@ -1,4 +1,4 @@
-module shell
+module github.com/beysed/shell
 
 go 1.22.1
 
