@@ -19,11 +19,8 @@ func MakeCommand(file string, args ...string) Command {
 	return Command{File: file, Args: args}
 }
 
-// func MakeExecution(cmd exec.Cmd) Execution {
-// }
-
 func forwardRead(pipe io.ReadCloser, ch chan<- []byte) {
-	buf := make([]byte, 64)
+	buf := make([]byte, 4096)
 	for {
 		l, err := pipe.Read(buf)
 		if l != 0 {
@@ -31,6 +28,7 @@ func forwardRead(pipe io.ReadCloser, ch chan<- []byte) {
 		}
 
 		if err != nil {
+			pipe.Close()
 			break
 		}
 	}
@@ -45,6 +43,7 @@ func forwardWrite(ch <-chan []byte, in io.WriteCloser) {
 			for toWrite > 0 {
 				wrote, err := in.Write(input[len(input)-toWrite:])
 				if err != nil {
+					in.Close()
 					break
 				}
 				toWrite -= wrote
@@ -109,6 +108,9 @@ func Execute(command Command, setup ...func(e *exec.Cmd)) (Execution, error) {
 
 	go func() {
 		err = cmd.Wait()
+		stdin.Close()
+		stdout.Close()
+		stderr.Close()
 		chExit <- err
 	}()
 

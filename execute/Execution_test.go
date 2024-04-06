@@ -13,18 +13,18 @@ import (
 
 func execute(t *testing.T, exe Execution) (bool, string) {
 	hasOutput := false
-	output := ""
+	output := strings.Builder{}
 
 	for run := true; run; {
 		select {
 		case o := <-exe.Stdout:
 			hasOutput = true
-			output = string(o)
+			output.Write(o)
 		case o := <-exe.Stderr:
 			fmt.Println(string(o))
 		case <-exe.Exit:
 			run = false
-		case <-time.After(time.Second * 3):
+		case <-time.After(time.Second):
 			t.Error("exit not fired, process hags, timeout")
 			exe.Kill()
 
@@ -32,7 +32,7 @@ func execute(t *testing.T, exe Execution) (bool, string) {
 		}
 	}
 
-	return hasOutput, output
+	return hasOutput, output.String()
 }
 
 func TestEnvironment(t *testing.T) {
@@ -56,7 +56,12 @@ func TestEnvironment(t *testing.T) {
 }
 
 func TestConversationSed(t *testing.T) {
-	exe, _ := Execute(MakeCommand("sed", "-e", "s/s/S/"))
+	exe, err := Execute(MakeCommand("sed", "-e", "s/s/S/"))
+
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
 	exe.Stdin <- []byte("sss")
 	close(exe.Stdin)
@@ -65,17 +70,6 @@ func TestConversationSed(t *testing.T) {
 
 	assert.True(t, hasOutput)
 	assert.Equal(t, "Sss", string(output))
-}
-
-func TestConversationCat(t *testing.T) {
-	exe, _ := Execute(MakeCommand("cat"))
-
-	exe.Stdin <- []byte{97, 97, 97}
-	close(exe.Stdin)
-
-	_, output := execute(t, exe)
-
-	assert.Equal(t, "aaa", string(output))
 }
 
 func TestOutput(t *testing.T) {
@@ -95,9 +89,28 @@ func TestOutput(t *testing.T) {
 	assert.True(t, hasOutput)
 }
 
+func TestCheckOutput(t *testing.T) {
+	var command string
+	var args []string
+
+	command = "bash"
+	testString := "00000000001111111111222222222233333333334444444444555555555566666666667777777777"
+
+	args = []string{"-c", fmt.Sprintf("echo %s", testString)}
+
+	exe, _ := Execute(MakeCommand(command, args...))
+	hasOutput, output := execute(t, exe)
+	assert.Equal(t, testString+"\n", output)
+	assert.True(t, hasOutput)
+}
+
 func TestExample(t *testing.T) {
 	command := MakeCommand("sed", "-e", "s/a/A/g")
-	execution, _ := Execute(command)
+	execution, err := Execute(command)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
 	execution.Stdin <- []byte("aaa")
 	close(execution.Stdin)
@@ -110,7 +123,7 @@ func TestExample(t *testing.T) {
 			fmt.Println(string(err))
 		case <-execution.Exit:
 			run = false
-		case <-time.After(time.Second * 3):
+		case <-time.After(time.Second):
 			t.Error("process killed by timeout")
 			execution.Kill()
 			run = false
