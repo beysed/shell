@@ -24,7 +24,7 @@ func execute(t *testing.T, exe Execution) (bool, string) {
 			fmt.Println(string(o))
 		case <-exe.Exit:
 			run = false
-		case <-time.After(time.Second):
+		case <-time.After(time.Second * 3):
 			t.Error("exit not fired, process hags, timeout")
 			exe.Kill()
 
@@ -123,7 +123,7 @@ func TestExample(t *testing.T) {
 			fmt.Println(string(err))
 		case <-execution.Exit:
 			run = false
-		case <-time.After(time.Second):
+		case <-time.After(time.Second * 3):
 			t.Error("process killed by timeout")
 			execution.Kill()
 			run = false

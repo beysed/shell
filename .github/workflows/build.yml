@@ -21,7 +21,7 @@ jobs:
           path: "~/.cache/bazel"
           key: bazel-build
       - name: Test
-        run: bazel run @rules_go//go -- test -v -coverprofile cover.out ./...
+        run: bazel run @io_bazel_rules_go//go -- test -v -coverprofile cover.out ./...
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
         env:
