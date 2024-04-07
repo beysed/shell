@@ -20,15 +20,16 @@ func MakeCommand(file string, args ...string) Command {
 }
 
 func forwardRead(pipe io.ReadCloser, ch chan<- []byte) {
-	buf := make([]byte, 4096)
+	buf := make([]byte, 10)
 	for {
 		l, err := pipe.Read(buf)
 		if l != 0 {
-			ch <- buf[:l]
+			c := make([]byte, l)
+			copy(c, buf)
+			ch <- c
 		}
 
 		if err != nil {
-			pipe.Close()
 			break
 		}
 	}
@@ -37,9 +38,10 @@ func forwardRead(pipe io.ReadCloser, ch chan<- []byte) {
 func forwardWrite(ch <-chan []byte, in io.WriteCloser) {
 	for {
 		input, ok := <-ch
-		toWrite := len(input)
 
 		if input != nil {
+			toWrite := len(input)
+
 			for toWrite > 0 {
 				wrote, err := in.Write(input[len(input)-toWrite:])
 				if err != nil {
@@ -64,6 +66,7 @@ func Execute(command Command, setup ...func(e *exec.Cmd)) (Execution, error) {
 		v(cmd)
 	}
 
+	//cmd.CombinedOutput()
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return Execution{}, err
@@ -79,15 +82,14 @@ func Execute(command Command, setup ...func(e *exec.Cmd)) (Execution, error) {
 		return Execution{}, err
 	}
 
-	err = cmd.Start()
-	if err != nil {
-		return Execution{}, err
-	}
-
 	chStdin := make(chan []byte)
 	chStdout := make(chan []byte)
 	chStderr := make(chan []byte)
 	chExit := make(chan error)
+
+	go forwardRead(stdout, chStdout)
+	go forwardRead(stderr, chStderr)
+	go forwardWrite(chStdin, stdin)
 
 	execution := Execution{
 		Stderr: chStderr,
@@ -102,15 +104,16 @@ func Execute(command Command, setup ...func(e *exec.Cmd)) (Execution, error) {
 			return cmd.Process.Kill()
 		}}
 
-	go forwardRead(stdout, chStdout)
-	go forwardRead(stderr, chStderr)
-	go forwardWrite(chStdin, stdin)
+	err = cmd.Start()
+	if err != nil {
+		return Execution{}, err
+	}
 
 	go func() {
 		err = cmd.Wait()
-		stdin.Close()
 		stdout.Close()
 		stderr.Close()
+
 		chExit <- err
 	}()
 

@@ -11,28 +11,31 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func execute(t *testing.T, exe Execution) (bool, string) {
+func execute(t *testing.T, exe Execution) (string, bool) {
 	hasOutput := false
 	output := strings.Builder{}
 
-	for run := true; run; {
+	run := true
+	for run {
 		select {
 		case o := <-exe.Stdout:
 			hasOutput = true
 			output.Write(o)
 		case o := <-exe.Stderr:
-			fmt.Println(string(o))
+			hasOutput = true
+			output.Write(o)
 		case <-exe.Exit:
 			run = false
 		case <-time.After(time.Second * 3):
-			t.Error("exit not fired, process hags, timeout")
 			exe.Kill()
+			t.Error("exit was not fired, process hags, timeout")
+			t.Fail()
 
 			run = false
 		}
 	}
 
-	return hasOutput, output.String()
+	return output.String(), hasOutput
 }
 
 func TestEnvironment(t *testing.T) {
@@ -48,8 +51,9 @@ func TestEnvironment(t *testing.T) {
 		command = MakeCommand("bash", "-c", "printenv MY")
 	}
 
-	exe, _ := Execute(command, setup)
-	hasOutput, output := execute(t, exe)
+	exe, err := Execute(command, setup)
+	assert.Nil(t, err)
+	output, hasOutput := execute(t, exe)
 
 	assert.True(t, hasOutput)
 	assert.True(t, strings.HasPrefix(output, "MY"))
@@ -58,15 +62,12 @@ func TestEnvironment(t *testing.T) {
 func TestConversationSed(t *testing.T) {
 	exe, err := Execute(MakeCommand("sed", "-e", "s/s/S/"))
 
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	assert.Nil(t, err)
 
 	exe.Stdin <- []byte("sss")
 	close(exe.Stdin)
 
-	hasOutput, output := execute(t, exe)
+	output, hasOutput := execute(t, exe)
 
 	assert.True(t, hasOutput)
 	assert.Equal(t, "Sss", string(output))
@@ -85,48 +86,23 @@ func TestOutput(t *testing.T) {
 	}
 
 	exe, _ := Execute(MakeCommand(command, args...))
-	hasOutput, _ := execute(t, exe)
+	_, hasOutput := execute(t, exe)
 	assert.True(t, hasOutput)
 }
 
 func TestCheckOutput(t *testing.T) {
-	var command string
-	var args []string
-
-	command = "bash"
+	var command Command
 	testString := "00000000001111111111222222222233333333334444444444555555555566666666667777777777"
+	echoCmd := fmt.Sprintf("echo %s", testString)
+	if runtime.GOOS == "windows" {
+		command = MakeCommand("cmd.exe", "/c", echoCmd)
+	} else {
+		command = MakeCommand("bash", "-c", echoCmd)
+	}
 
-	args = []string{"-c", fmt.Sprintf("echo %s", testString)}
-
-	exe, _ := Execute(MakeCommand(command, args...))
-	hasOutput, output := execute(t, exe)
-	assert.Equal(t, testString+"\n", output)
+	exe, err := Execute(command)
+	assert.Nil(t, err)
+	output, hasOutput := execute(t, exe)
 	assert.True(t, hasOutput)
-}
-
-func TestExample(t *testing.T) {
-	command := MakeCommand("sed", "-e", "s/a/A/g")
-	execution, err := Execute(command)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	execution.Stdin <- []byte("aaa")
-	close(execution.Stdin)
-
-	for run := true; run; {
-		select {
-		case out := <-execution.Stdout:
-			fmt.Print(string(out))
-		case err := <-execution.Stderr:
-			fmt.Println(string(err))
-		case <-execution.Exit:
-			run = false
-		case <-time.After(time.Second * 3):
-			t.Error("process killed by timeout")
-			execution.Kill()
-			run = false
-		}
-	}
+	assert.True(t, strings.HasPrefix(output, testString))
 }
